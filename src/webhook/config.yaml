@@ -1,0 +1,10 @@
+projects:
+  ims:
+    dir: D:/www/ims
+    cmd:
+      - git pull
+      - npm run dev
+  adSys:
+    dir: D:/www/adSys
+    cmd:
+      - git pull
