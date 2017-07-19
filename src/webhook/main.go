@@ -1,14 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"github.com/olebedev/config"
 	"net/http"
 	"os/exec"
-	"bytes"
-	"time"
-	"github.com/olebedev/config"
 	"strconv"
-	"errors"
+	"strings"
+	"time"
 )
 
 const configFile = "./src/webhook/config.yaml"
@@ -32,26 +33,47 @@ func main() {
 	//return
 
 	cnt := 0
-	http.HandleFunc("/", func (res http.ResponseWriter, req *http.Request) {
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		cnt++
-		fmt.Printf("#%d\t%s\t%s\n", cnt, req.RequestURI, req.RemoteAddr)
-		fmt.Fprintf(res, "uri: %s", req.URL.Path)
+		fmt.Printf("%v\t#%d\t%s\t%s\n", time.Now(), cnt, req.RequestURI, req.RemoteAddr)
+		defer fmt.Fprintf(res, "uri: %s", req.URL.Path)
 
-		cmd := exec.Command("git", "pull")
-		cmd.Dir = "D:/www/ims"
+		req.ParseForm()
+		//fmt.Println(req.Form)
 
-		var out bytes.Buffer
-		cmd.Stdout = &out
+		project := strings.Join(req.Form["project"], "")
+		_ = strings.Join(req.Form["action"], "")
 
-		fmt.Println(time.Now())
-		time.Sleep(5 * 1000 * 1000 * 1000)
-		fmt.Println(time.Now())
+		projectCfg, ok := projects[project]
+		if !ok {
+			res.WriteHeader(400)
+			return
+		}
+		//fmt.Println(projectCfg)
 
-		cmd.Run()
-		fmt.Println(out.String())
+		fmt.Println("project: ", project)
+		fmt.Println("dir: ", projectCfg.dir)
+		for _, v := range projectCfg.cmd {
+			fmt.Println("execute: " + v)
+
+			args := strings.Split(v, " ")
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Dir = projectCfg.dir
+
+			var out bytes.Buffer
+			cmd.Stdout = &out
+
+			cmd.Run()
+			fmt.Println(out.String())
+		}
 	})
-	fmt.Println("listening on 0.0.0.0:8080")
-	http.ListenAndServe("0.0.0.0:8080", nil)
+
+	addr := "0.0.0.0:8081"
+	fmt.Println("listening on " + addr)
+	err = http.ListenAndServe(addr, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func initProject() (projects map[string]Project, err error) {
@@ -67,7 +89,6 @@ func initProject() (projects map[string]Project, err error) {
 	if len(values) <= 0 {
 		return nil, errors.New(configFile + " has no valid project config")
 	}
-
 
 	projects = make(map[string]Project)
 
