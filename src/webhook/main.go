@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	//"os"
 )
 
 const configFile = "./src/webhook/config.yaml"
@@ -21,12 +22,12 @@ type Project struct {
 }
 
 func main() {
-	projects, err := initProject()
+	addr, projects, err := getConfig()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(projects)
+	fmt.Println(addr, projects)
 	//return
 	//dir, err := projects.String("ims.dir")
 	//fmt.Println(dir)
@@ -51,24 +52,33 @@ func main() {
 		}
 		//fmt.Println(projectCfg)
 
-		fmt.Println("project: ", project)
-		fmt.Println("dir: ", projectCfg.dir)
-		for _, v := range projectCfg.cmd {
-			fmt.Println("execute: " + v)
+		// 异步执行构建命令
+		go func() {
+			fmt.Println("project: ", project)
+			fmt.Println("dir: ", projectCfg.dir)
+			for _, v := range projectCfg.cmd {
+				fmt.Println("execute: " + v)
 
-			args := strings.Split(v, " ")
-			cmd := exec.Command(args[0], args[1:]...)
-			cmd.Dir = projectCfg.dir
+				args := strings.Split(v, " ")
+				cmd := exec.Command(args[0], args[1:]...)
+				cmd.Dir = projectCfg.dir
 
-			var out bytes.Buffer
-			cmd.Stdout = &out
+				var out bytes.Buffer
+				cmd.Stdout = &out
+				cmd.Stderr = &out
 
-			cmd.Run()
-			fmt.Println(out.String())
-		}
+				err = cmd.Run()
+				if err != nil {
+					fmt.Println(err)
+					break
+				} else {
+					fmt.Println(out.String())
+				}
+			}
+		}()
 	})
 
-	addr := "0.0.0.0:8081"
+	//addr := "127.0.0.1:8081"
 	fmt.Println("listening on " + addr)
 	err = http.ListenAndServe(addr, nil)
 	if err != nil {
@@ -76,23 +86,24 @@ func main() {
 	}
 }
 
-func initProject() (projects map[string]Project, err error) {
+func getConfig() (addr string, projects map[string]Project, err error) {
 	cfg, err := config.ParseYamlFile(configFile)
 	if err != nil {
 		return
 	}
 
+	addr, _ = cfg.String("bindAddr")
 	values, err := cfg.Map("projects")
 	if err != nil {
 		return
 	}
 	if len(values) <= 0 {
-		return nil, errors.New(configFile + " has no valid project config")
+		return "", nil, errors.New(configFile + " has no valid project config")
 	}
 
 	projects = make(map[string]Project)
 
-	for k, _ := range values {
+	for k := range values {
 		projectCfg, _ := cfg.Get("projects." + k)
 		dir, _ := projectCfg.String("dir")
 		cmd, _ := projectCfg.List("cmd")
@@ -110,5 +121,5 @@ func initProject() (projects map[string]Project, err error) {
 		//fmt.Println(projects[k])
 	}
 
-	return projects, err
+	return addr, projects, err
 }

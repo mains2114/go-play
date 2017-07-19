@@ -1,6 +1,7 @@
+bindAddr: 127.0.0.1:8082
 projects:
   ims:
-    dir: D:/www/ims
+    dir: /Users/huang/Documents/www/ims
     cmd:
       - git pull
       - npm run dev
