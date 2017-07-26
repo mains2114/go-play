@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"github.com/olebedev/config"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 	//"os"
 )
 
-const configFile = "./src/webhook/config.yaml"
+var configFile string
 
 type Project struct {
 	key string
@@ -22,6 +23,10 @@ type Project struct {
 }
 
 func main() {
+	flag.StringVar(&configFile, "c", "./src/webhook/config.yaml", "config file path")
+	flag.Parse()
+	fmt.Println("config file: " + configFile)
+
 	addr, projects, err := getConfig()
 	if err != nil {
 		fmt.Println(err)
